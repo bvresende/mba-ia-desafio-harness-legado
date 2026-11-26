@@ -46,6 +46,6 @@ description: "Task list for Feature 003: Refatoração Completa das Invariantes 
 **Purpose**: Confirmar conformidade ponta a ponta de todo o repositório após as duas frentes.
 
 - [X] T016 [US3] Executar `npm run gates` na raiz e confirmar saída `0` (`Gates OK (G1–G12): 0 violações`)
-- [ ] T017 [US3] Executar `bash kit-gates/verificar.sh . "npm run gates"` e `bash kit-gates-proprios/verificar.sh . "npm run gates"` confirmando 100% de detecção
+- [X] T017 [US3] Executar `bash kit-gates/verificar.sh . "npm run gates"` e `bash kit-gates-proprios/verificar.sh . "npm run gates"` confirmando 100% de detecção
 - [X] T018 [US3] Verificar ausência total de comentários de supressão (`eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`) em `api/src/` e `web/src/`
-- [ ] T019 [US3] Subir ambiente via `npm run up`, executar a suíte `blackbox/` garantindo 100% de aprovação e encerrar com `npm run down`
+- [X] T019 [US3] Subir ambiente via `npm run up`, executar a suíte `blackbox/` garantindo 100% de aprovação e encerrar com `npm run down`
