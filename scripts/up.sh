@@ -94,6 +94,7 @@ if [ ! -f "$WEB_ENV_FILE" ] || [ "$(cat "$WEB_ENV_FILE")" != "$new_web_env" ]; t
   WEB_ENV_CHANGED=1
 fi
 
+ensure_npm_ci "$REPO_ROOT"
 ensure_npm_ci "$REPO_ROOT/api"
 ensure_npm_ci "$REPO_ROOT/web"
 
