@@ -22,21 +22,50 @@ async function runOnce() {
         data: { category: result.category, priority: result.priority, triageStatus: 'done' },
       })
       console.log(`chamado ${ticket.id} triado: ${result.category}/${result.priority}`)
-    } catch (err: any) {
-      console.log(`falha na triagem do chamado ${ticket.id}: ${err.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.log(`falha na triagem do chamado ${ticket.id}: ${message}`)
       await prisma.ticket.update({ where: { id: ticket.id }, data: { triageStatus: 'failed' } })
     }
   }
 }
 
+let stopped = false
+let timer: ReturnType<typeof setTimeout> | undefined
+
 async function loop() {
+  if (stopped) {
+    return
+  }
   try {
     await runOnce()
   } catch (err) {
     console.log('erro no worker', err)
   }
-  setTimeout(loop, interval)
+  if (!stopped) {
+    timer = setTimeout(loop, interval)
+  }
 }
 
+async function shutdown() {
+  if (stopped) {
+    return
+  }
+  stopped = true
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    timer = undefined
+  }
+  await prisma.$disconnect()
+  process.exit(0)
+}
+
+process.on('SIGINT', () => {
+  void shutdown()
+})
+process.on('SIGTERM', () => {
+  void shutdown()
+})
+
 console.log(`worker de triagem rodando a cada ${interval}ms`)
-loop()
+void loop()

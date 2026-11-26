@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+
+if [ -f "$REPO_ROOT/scripts/pre-commit.sh" ]; then
+  exec bash "$REPO_ROOT/scripts/pre-commit.sh"
+fi
+
+exit 0
