@@ -1,23 +1,40 @@
-import express from 'express'
 import cors from 'cors'
+import express from 'express'
 import { getCorsOrigins } from '../config/env'
-import healthRoutes from './routes/health'
-import authRoutes from './routes/auth'
-import ticketRoutes from './routes/tickets'
-import attachmentRoutes from './routes/attachments'
-import statsRoutes from './routes/stats'
+import { AttachmentService } from '../services/attachment-service'
+import { AuthService } from '../services/auth-service'
+import { HealthService } from '../services/health-service'
+import { StatsService } from '../services/stats-service'
+import { TicketService } from '../services/ticket-service'
 import { errorHandler, notFoundHandler } from './errors'
+import { createAttachmentRoutes } from './routes/attachments'
+import { createAuthRoutes } from './routes/auth'
+import { createHealthRoutes } from './routes/health'
+import { createStatsRoutes } from './routes/stats'
+import { createTicketRoutes } from './routes/tickets'
 
-export const app = express()
+export interface AppDeps {
+  authService: AuthService
+  ticketService: TicketService
+  attachmentService: AttachmentService
+  healthService: HealthService
+  statsService: StatsService
+}
 
-app.use(cors({ origin: getCorsOrigins() }))
-app.use(express.json())
+export function createApp(deps: AppDeps) {
+  const app = express()
 
-app.use('/api/health', healthRoutes)
-app.use('/api/auth', authRoutes)
-app.use('/api/tickets', ticketRoutes)
-app.use('/api/attachments', attachmentRoutes)
-app.use('/api/stats', statsRoutes)
+  app.use(cors({ origin: getCorsOrigins() }))
+  app.use(express.json())
 
-app.use(notFoundHandler)
-app.use(errorHandler)
+  app.use('/api/health', createHealthRoutes(deps.healthService))
+  app.use('/api/auth', createAuthRoutes(deps.authService))
+  app.use('/api/tickets', createTicketRoutes(deps.ticketService, deps.attachmentService))
+  app.use('/api/attachments', createAttachmentRoutes(deps.attachmentService))
+  app.use('/api/stats', createStatsRoutes(deps.statsService))
+
+  app.use(notFoundHandler)
+  app.use(errorHandler)
+
+  return app
+}

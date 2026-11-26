@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { TicketService, formatTicketRef } from './ticket-service'
-import { HttpError } from '../http/errors'
-import { CurrentUser, Ticket } from '../domain/ticket'
-import { TicketFilter, TicketRepository, TicketUpdate } from '../repositories/ticket-repository'
+import { AuthUser, User } from '../domain/auth'
+import { AppError } from '../domain/errors'
+import { formatTicketRef, Reply, Ticket, TicketDetails } from '../domain/ticket'
 import { ReplyRepository } from '../repositories/reply-repository'
+import { TicketFilter, TicketRepository, TicketUpdate } from '../repositories/ticket-repository'
+import { NewUser, UserRepository } from '../repositories/user-repository'
+import { TicketService } from './ticket-service'
 
 class FakeTicketRepository implements TicketRepository {
   items: Ticket[] = []
@@ -33,7 +35,7 @@ class FakeTicketRepository implements TicketRepository {
     return this.items.find((t) => t.id === id) || null
   }
 
-  async findByIdWithDetails(id: string) {
+  async findByIdWithDetails(id: string): Promise<TicketDetails | null> {
     const ticket = await this.findById(id)
     return ticket ? { ...ticket, replies: [], attachments: [] } : null
   }
@@ -54,37 +56,84 @@ class FakeTicketRepository implements TicketRepository {
 }
 
 class FakeReplyRepository implements ReplyRepository {
-  items: any[] = []
+  items: Reply[] = []
 
-  async create(data: { ticketId: string; authorId: string; body: string }) {
-    const reply = { id: `reply-${this.items.length + 1}`, ...data, createdAt: new Date() }
+  async create(data: { ticketId: string; authorId: string; body: string }): Promise<Reply> {
+    const reply: Reply = {
+      id: `reply-${this.items.length + 1}`,
+      ...data,
+      createdAt: new Date(),
+      author: { id: data.authorId, name: 'Usuário', role: 'customer' },
+    }
     this.items.push(reply)
     return reply
   }
 }
 
-const customer: CurrentUser = { id: 'c1', role: 'customer' }
-const otherCustomer: CurrentUser = { id: 'c2', role: 'customer' }
-const agent: CurrentUser = { id: 'a1', role: 'agent' }
-const otherAgent: CurrentUser = { id: 'a2', role: 'agent' }
-const admin: CurrentUser = { id: 'adm', role: 'admin' }
+class FakeUserRepository implements UserRepository {
+  items: User[] = []
 
-async function expectHttpError(promise: Promise<unknown>, status: number, code: string) {
-  const err: any = await promise.catch((e) => e)
-  expect(err).toBeInstanceOf(HttpError)
-  expect(err.status).toBe(status)
-  expect(err.code).toBe(code)
+  async findById(id: string) {
+    return this.items.find((u) => u.id === id) || null
+  }
+
+  async findByEmail(email: string) {
+    return this.items.find((u) => u.email === email) || null
+  }
+
+  async create(data: NewUser): Promise<User> {
+    const user: User = {
+      id: `u${this.items.length + 1}`,
+      role: data.role ?? 'customer',
+      createdAt: new Date(),
+      name: data.name,
+      email: data.email,
+      passwordHash: data.passwordHash,
+    }
+    this.items.push(user)
+    return user
+  }
+}
+
+const customer: AuthUser = { id: 'c1', role: 'customer' }
+const otherCustomer: AuthUser = { id: 'c2', role: 'customer' }
+const agent: AuthUser = { id: 'a1', role: 'agent' }
+const otherAgent: AuthUser = { id: 'a2', role: 'agent' }
+const admin: AuthUser = { id: 'adm', role: 'admin' }
+
+async function expectAppError(promise: Promise<unknown>, status: number, code: string) {
+  let caught: unknown
+  try {
+    await promise
+  } catch (err) {
+    caught = err
+  }
+  expect(caught).toBeInstanceOf(AppError)
+  if (caught instanceof AppError) {
+    expect(caught.status).toBe(status)
+    expect(caught.code).toBe(code)
+  }
 }
 
 describe('TicketService', () => {
   let tickets: FakeTicketRepository
   let replies: FakeReplyRepository
+  let users: FakeUserRepository
   let service: TicketService
 
   beforeEach(() => {
     tickets = new FakeTicketRepository()
     replies = new FakeReplyRepository()
-    service = new TicketService(tickets, replies)
+    users = new FakeUserRepository()
+    users.items.push({
+      id: 'c1',
+      name: 'Maria',
+      email: 'maria@x.com',
+      passwordHash: 'x',
+      role: 'customer',
+      createdAt: new Date(),
+    })
+    service = new TicketService(tickets, replies, users)
   })
 
   const valid = { title: 'Problema no app', description: 'O aplicativo fecha sozinho ao abrir' }
@@ -99,12 +148,12 @@ describe('TicketService', () => {
   })
 
   it('não deixa atendente abrir chamado', async () => {
-    await expectHttpError(service.create(agent, valid), 403, 'forbidden')
+    await expectAppError(service.create(agent, valid), 403, 'forbidden')
   })
 
   it('valida título e descrição', async () => {
-    await expectHttpError(service.create(customer, { title: 'Oi', description: valid.description }), 422, 'validation_error')
-    await expectHttpError(service.create(customer, { title: valid.title, description: 'curta' }), 422, 'validation_error')
+    await expectAppError(service.create(customer, { title: 'Oi', description: valid.description }), 422, 'validation_error')
+    await expectAppError(service.create(customer, { title: valid.title, description: 'curta' }), 422, 'validation_error')
   })
 
   it('cliente só lista os próprios chamados', async () => {
@@ -120,7 +169,7 @@ describe('TicketService', () => {
 
   it('cliente recebe 404 no chamado de outro cliente', async () => {
     const ticket = await service.create(otherCustomer, valid)
-    await expectHttpError(service.getById(customer, ticket.id), 404, 'not_found')
+    await expectAppError(service.getById(customer, ticket.id), 404, 'not_found')
   })
 
   it('atendente assume chamado aberto', async () => {
@@ -134,25 +183,25 @@ describe('TicketService', () => {
     const ticket = await service.create(customer, valid)
     await service.assign(agent, ticket.id)
     await service.resolve(agent, ticket.id)
-    await expectHttpError(service.assign(agent, ticket.id), 409, 'invalid_transition')
+    await expectAppError(service.assign(agent, ticket.id), 409, 'invalid_transition')
   })
 
   it('cliente não assume chamado', async () => {
     const ticket = await service.create(customer, valid)
-    await expectHttpError(service.assign(customer, ticket.id), 403, 'forbidden')
+    await expectAppError(service.assign(customer, ticket.id), 403, 'forbidden')
   })
 
   it('só quem assumiu resolve', async () => {
     const ticket = await service.create(customer, valid)
     await service.assign(agent, ticket.id)
-    await expectHttpError(service.resolve(otherAgent, ticket.id), 403, 'forbidden')
+    await expectAppError(service.resolve(otherAgent, ticket.id), 403, 'forbidden')
     const resolved = await service.resolve(admin, ticket.id)
     expect(resolved.status).toBe('resolved')
   })
 
   it('não resolve chamado que não está em andamento', async () => {
     const ticket = await service.create(customer, valid)
-    await expectHttpError(service.resolve(admin, ticket.id), 409, 'invalid_transition')
+    await expectAppError(service.resolve(admin, ticket.id), 409, 'invalid_transition')
   })
 
   it('resposta do cliente reabre chamado resolvido mantendo o responsável', async () => {
@@ -175,8 +224,17 @@ describe('TicketService', () => {
 
   it('não aceita resposta vazia', async () => {
     const ticket = await service.create(customer, valid)
-    await expectHttpError(service.addReply(customer, ticket.id, { body: '' }), 422, 'validation_error')
+    await expectAppError(service.addReply(customer, ticket.id, { body: '' }), 422, 'validation_error')
     expect(replies.items).toHaveLength(0)
+  })
+
+  it('sugere resposta só para atendentes e admins', async () => {
+    const ticket = await service.create(customer, valid)
+    await expectAppError(service.suggestReply(customer, ticket.id), 403, 'forbidden')
+    await expectAppError(service.suggestReply(agent, 'inexistente'), 404, 'not_found')
+    const result = await service.suggestReply(agent, ticket.id)
+    expect(result.suggestion).toContain('Maria')
+    expect(result.suggestion).toContain(valid.title)
   })
 
   it('formata a referência do chamado', () => {

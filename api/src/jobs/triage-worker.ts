@@ -1,34 +1,8 @@
-import { PrismaClient } from '@prisma/client'
-import { classifyTicket } from '../integrations/ai-client'
+import { createServices } from '../composition/container'
+import { env } from '../config/env'
 
-const prisma = new PrismaClient({
-  datasources: { db: { url: process.env.DATABASE_URL } },
-})
-
-const interval = Number(process.env.TRIAGE_INTERVAL_MS || 2000)
-
-async function runOnce() {
-  const tickets = await prisma.ticket.findMany({
-    where: { triageStatus: 'pending' },
-    orderBy: { createdAt: 'asc' },
-    take: 10,
-  })
-
-  for (const ticket of tickets) {
-    try {
-      const result = await classifyTicket(ticket)
-      await prisma.ticket.update({
-        where: { id: ticket.id },
-        data: { category: result.category, priority: result.priority, triageStatus: 'done' },
-      })
-      console.log(`chamado ${ticket.id} triado: ${result.category}/${result.priority}`)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.log(`falha na triagem do chamado ${ticket.id}: ${message}`)
-      await prisma.ticket.update({ where: { id: ticket.id }, data: { triageStatus: 'failed' } })
-    }
-  }
-}
+const { triageService } = createServices()
+const interval = env.TRIAGE_INTERVAL_MS
 
 let stopped = false
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -38,7 +12,7 @@ async function loop() {
     return
   }
   try {
-    await runOnce()
+    await triageService.runOnce()
   } catch (err) {
     console.log('erro no worker', err)
   }
@@ -56,7 +30,7 @@ async function shutdown() {
     clearTimeout(timer)
     timer = undefined
   }
-  await prisma.$disconnect()
+  await triageService.disconnect()
   process.exit(0)
 }
 

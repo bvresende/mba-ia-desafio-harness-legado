@@ -1,5 +1,9 @@
+import { createServices } from './composition/container'
 import { env } from './config/env'
-import { app } from './http/app'
+import { createApp } from './http/app'
+
+const services = createServices()
+const app = createApp(services)
 
 const server = app.listen(env.PORT, () => {
   console.log(`API rodando em http://localhost:${env.PORT}`)

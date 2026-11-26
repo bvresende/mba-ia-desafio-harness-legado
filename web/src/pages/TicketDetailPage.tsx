@@ -1,11 +1,11 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getCurrentUser } from '../api/auth'
-import { getToken } from '../api/client'
 import {
   addReply,
   assignTicket,
   Attachment,
+  downloadAttachment,
   getTicket,
   resolveTicket,
   suggestReply,
@@ -13,8 +13,8 @@ import {
   uploadAttachment,
 } from '../api/tickets'
 import StatusBadge from '../components/StatusBadge'
-import { categoryLabels, formatBytes, formatDate, priorityLabels } from '../utils/format'
-import type { TicketCategory, TicketPriority, TriageStatus } from '../../../api/src/domain/ticket'
+import type { TicketCategory, TicketPriority, TriageStatus } from '../types/ticket'
+import { categoryLabels, formatBytes, formatDate, getErrorMessage, priorityLabels } from '../utils/format'
 
 function triageText(triageStatus: TriageStatus, category: TicketCategory | null, priority: TicketPriority | null) {
   if (triageStatus === 'pending') return 'Em triagem'
@@ -34,7 +34,7 @@ export default function TicketDetailPage() {
   const load = useCallback(() => {
     getTicket(id!)
       .then(setTicket)
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) => setError(getErrorMessage(err)))
   }, [id])
 
   useEffect(() => {
@@ -52,8 +52,8 @@ export default function TicketDetailPage() {
     try {
       await action()
       load()
-    } catch (err: any) {
-      setActionError(err.message)
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err))
     }
   }
 
@@ -70,8 +70,8 @@ export default function TicketDetailPage() {
     try {
       const data = await suggestReply(id!)
       setBody(data.suggestion)
-    } catch (err: any) {
-      setActionError(err.message)
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err))
     }
   }
 
@@ -86,21 +86,17 @@ export default function TicketDetailPage() {
   }
 
   async function handleDownload(attachment: Attachment) {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000'
-    const res = await fetch(`${apiUrl}/api/attachments/${attachment.id}/download`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
-    if (!res.ok) {
-      setActionError('Não foi possível baixar o anexo')
-      return
+    try {
+      const blob = await downloadAttachment(attachment.id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = attachment.originalName
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: unknown) {
+      setActionError(getErrorMessage(err, 'Não foi possível baixar o anexo'))
     }
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = attachment.originalName
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   if (error) return <p className="error">{error}</p>

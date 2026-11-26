@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { getCurrentUser } from '../api/auth'
 import { listTickets, TicketPage } from '../api/tickets'
 import StatusBadge from '../components/StatusBadge'
-import { formatDate } from '../utils/format'
+import { formatDate, getErrorMessage } from '../utils/format'
 
 export default function TicketsPage() {
   const user = getCurrentUser()
@@ -15,7 +15,7 @@ export default function TicketsPage() {
   useEffect(() => {
     listTickets(status, page)
       .then(setData)
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) => setError(getErrorMessage(err)))
   }, [status, page])
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1

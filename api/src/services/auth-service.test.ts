@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { AuthService, EmailTakenError, InvalidCredentialsError } from './auth-service'
+import { User } from '../domain/auth'
+import { AppError } from '../domain/errors'
 import { NewUser, UserRepository } from '../repositories/user-repository'
+import { AuthService, EmailTakenError, InvalidCredentialsError } from './auth-service'
 
 class FakeUserRepository implements UserRepository {
-  users: any[] = []
+  users: User[] = []
 
   async findById(id: string) {
     return this.users.find((u) => u.id === id) || null
@@ -13,8 +15,15 @@ class FakeUserRepository implements UserRepository {
     return this.users.find((u) => u.email === email) || null
   }
 
-  async create(data: NewUser): Promise<any> {
-    const user = { id: `u${this.users.length + 1}`, role: 'customer', createdAt: new Date(), ...data }
+  async create(data: NewUser): Promise<User> {
+    const user: User = {
+      id: `u${this.users.length + 1}`,
+      role: data.role ?? 'customer',
+      createdAt: new Date(),
+      name: data.name,
+      email: data.email,
+      passwordHash: data.passwordHash,
+    }
     this.users.push(user)
     return user
   }
@@ -43,5 +52,12 @@ describe('AuthService', () => {
     await expect(service.login({ email: 'maria@x.com', password: 'errada123' })).rejects.toBeInstanceOf(
       InvalidCredentialsError,
     )
+  })
+
+  it('retorna usuário atual em getMe e recusa inexistente', async () => {
+    const service = new AuthService(new FakeUserRepository())
+    const created = await service.register({ name: 'Maria', email: 'maria@x.com', password: '12345678' })
+    expect(await service.getMe(created.id)).toEqual(created)
+    await expect(service.getMe('nao-existe')).rejects.toBeInstanceOf(AppError)
   })
 })

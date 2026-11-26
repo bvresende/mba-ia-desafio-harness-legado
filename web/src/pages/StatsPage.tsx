@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getCurrentUser } from '../api/auth'
 import { getStats, Stats } from '../api/stats'
-import { categoryLabels, priorityLabels, statusLabels } from '../utils/format'
+import { categoryLabels, getErrorMessage, priorityLabels, statusLabels } from '../utils/format'
 
 function StatsTable({ title, data, labels }: { title: string; data: Record<string, number>; labels: Record<string, string> }) {
   return (
@@ -30,8 +30,8 @@ export default function StatsPage() {
     if (user?.role !== 'admin') return
     getStats()
       .then(setStats)
-      .catch((err) => setError(err.message))
-  }, [])
+      .catch((err: unknown) => setError(getErrorMessage(err)))
+  }, [user?.role])
 
   if (user?.role !== 'admin') return <p className="error">Acesso restrito ao admin.</p>
   if (error) return <p className="error">{error}</p>

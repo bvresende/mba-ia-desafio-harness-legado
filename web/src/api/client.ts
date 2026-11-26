@@ -1,6 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { env } from '../config/env'
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     public status: number,
     public code: string,
@@ -20,7 +20,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   if (token) headers.Authorization = `Bearer ${token}`
   if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json'
 
-  const res = await fetch(`${API_URL}/api${path}`, { ...options, headers })
+  const res = await fetch(`${env.apiUrl}/api${path}`, { ...options, headers })
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
 

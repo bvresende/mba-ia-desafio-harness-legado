@@ -1,7 +1,8 @@
 import { apiFetch, getToken } from './client'
-import type { TicketCategory, TicketPriority, TicketStatus, TriageStatus } from '../../../api/src/domain/ticket'
+import { env } from '../config/env'
+import type { TicketCategory, TicketPriority, TicketStatus, TriageStatus } from '../types/ticket'
 
-export type Ticket = {
+type Ticket = {
   id: string
   title: string
   description: string
@@ -15,7 +16,7 @@ export type Ticket = {
   updatedAt: string
 }
 
-export type Reply = {
+type Reply = {
   id: string
   ticketId: string
   authorId: string
@@ -76,7 +77,7 @@ export function suggestReply(id: string) {
 export async function uploadAttachment(id: string, file: File) {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/tickets/${id}/attachments`, {
+  const res = await fetch(`${env.apiUrl}/api/tickets/${id}/attachments`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },
     body: form,
@@ -84,4 +85,12 @@ export async function uploadAttachment(id: string, file: File) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.message || 'Falha no upload')
   return data as Attachment
+}
+
+export async function downloadAttachment(attachmentId: string): Promise<Blob> {
+  const res = await fetch(`${env.apiUrl}/api/attachments/${attachmentId}/download`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) throw new Error('Não foi possível baixar o anexo')
+  return res.blob()
 }
