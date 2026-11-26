@@ -128,23 +128,17 @@ WEB_LOG="$LOGS_DIR/web.log"
 
 if [ "$API_ENV_CHANGED" -eq 1 ] || ! is_service_alive "$API_PID_FILE" "src/main.ts"; then
   stop_service "$API_PID_FILE" "src/main.ts"
-  nohup bash -c 'cd "$1" && exec ./node_modules/.bin/tsx --env-file=.env src/main.ts' _ "$REPO_ROOT/api" \
-    > "$API_LOG" 2>&1 < /dev/null &
-  echo "$!" > "$API_PID_FILE"
+  spawn_detached "$REPO_ROOT/api" "$API_LOG" "$API_PID_FILE" ./node_modules/.bin/tsx --env-file=.env src/main.ts
 fi
 
 if [ "$API_ENV_CHANGED" -eq 1 ] || ! is_service_alive "$WORKER_PID_FILE" "src/jobs/triage-worker.ts"; then
   stop_service "$WORKER_PID_FILE" "src/jobs/triage-worker.ts"
-  nohup bash -c 'cd "$1" && exec ./node_modules/.bin/tsx --env-file=.env src/jobs/triage-worker.ts' _ "$REPO_ROOT/api" \
-    > "$WORKER_LOG" 2>&1 < /dev/null &
-  echo "$!" > "$WORKER_PID_FILE"
+  spawn_detached "$REPO_ROOT/api" "$WORKER_LOG" "$WORKER_PID_FILE" ./node_modules/.bin/tsx --env-file=.env src/jobs/triage-worker.ts
 fi
 
 if [ "$WEB_ENV_CHANGED" -eq 1 ] || ! is_service_alive "$WEB_PID_FILE" "vite"; then
   stop_service "$WEB_PID_FILE" "vite"
-  nohup bash -c 'cd "$1" && VITE_PORT="$2" exec ./node_modules/.bin/vite --port "$2" --strictPort --host localhost' _ "$REPO_ROOT/web" "$WEB_PORT" \
-    > "$WEB_LOG" 2>&1 < /dev/null &
-  echo "$!" > "$WEB_PID_FILE"
+  VITE_PORT="$WEB_PORT" spawn_detached "$REPO_ROOT/web" "$WEB_LOG" "$WEB_PID_FILE" ./node_modules/.bin/vite --port "$WEB_PORT" --strictPort --host localhost
 fi
 
 if ! wait_for_http "http://localhost:${API_PORT}/api/health" 30 '"db":"ok"'; then

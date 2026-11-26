@@ -188,3 +188,29 @@ ensure_npm_ci() {
     printf '%s\n' "$lock_hash" > "$hash_file"
   fi
 }
+
+spawn_detached() {
+  local workdir="$1"
+  local log_file="$2"
+  local pid_file="$3"
+  shift 3
+
+  : > "$log_file"
+  local pid
+  pid="$(node -e '
+    const fs = require("node:fs");
+    const { spawn } = require("node:child_process");
+    const [workdir, logFile, cmd, ...args] = process.argv.slice(1);
+    const out = fs.openSync(logFile, "a");
+    const child = spawn(cmd, args, {
+      cwd: workdir,
+      detached: true,
+      stdio: ["ignore", out, out],
+    });
+    child.unref();
+    fs.closeSync(out);
+    process.stdout.write(String(child.pid));
+  ' "$workdir" "$log_file" "$@")"
+
+  printf '%s\n' "$pid" > "$pid_file"
+}
