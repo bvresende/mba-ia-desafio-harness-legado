@@ -210,7 +210,7 @@ spawn_detached() {
     child.unref();
     fs.closeSync(out);
     process.stdout.write(String(child.pid));
-  ' "$workdir" "$log_file" "$@")"
+  ' -- "$workdir" "$log_file" "$@")"
 
   printf '%s\n' "$pid" > "$pid_file"
 }
