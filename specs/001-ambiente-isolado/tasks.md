@@ -111,7 +111,7 @@ description: "Task list for Feature 001: Ambiente Isolado e Idempotente por Cóp
 **Purpose**: Verificar ausência de regressões, estado limpo do Git e todos os critérios de aceite do `quickstart.md`.
 
 - [X] T018 Executar testes unitários da API (`cd api && npm test`) sem `.env` e confirmar que `git status` permanece limpo (sem lockfiles alterados nem arquivos efêmeros untracked) após `npm run up`
-- [ ] T019 Executar todos os cenários de `specs/001-ambiente-isolado/quickstart.md`: subida limpa, 2ª subida idempotente, worktree paralela `copia-b`, verificação visual no navegador (login, triagem <= 15s e anexo isolado) via subagente `browser`, suíte `blackbox/` contra ambas as cópias, derrubada isolada de `copia-b` preservando `copia-a`, nova subida de `copia-b` e limpeza final da worktree temporária
+- [X] T019 Executar todos os cenários de `specs/001-ambiente-isolado/quickstart.md`: subida limpa, 2ª subida idempotente, worktree paralela `copia-b`, verificação visual no navegador (login, triagem <= 15s e anexo isolado) via subagente `browser`, suíte `blackbox/` contra ambas as cópias, derrubada isolada de `copia-b` preservando `copia-a`, nova subida de `copia-b` e limpeza final da worktree temporária
 
 ---
 
